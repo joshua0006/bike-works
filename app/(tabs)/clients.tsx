@@ -1,26 +1,22 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { RecentSales } from '../../components/sales/RecentSales';
+import { ClientList } from '../../components/clients/ClientList';
 
-export default function IndexScreen() {
+export default function ClientsScreen() {
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Dashboard</Text>
-        <Link href="/sales/new" asChild>
+        <Text style={styles.title}>Clients</Text>
+        <Link href="/clients/new" asChild>
           <Pressable style={styles.addButton}>
             <Ionicons name="add" size={24} color="#ffffff" />
-            <Text style={styles.addButtonText}>New Sale</Text>
+            <Text style={styles.addButtonText}>New Client</Text>
           </Pressable>
         </Link>
       </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Sales</Text>
-        <RecentSales />
-      </View>
-    </ScrollView>
+      <ClientList />
+    </View>
   );
 }
 
@@ -55,14 +51,5 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: '#ffffff',
     fontWeight: '600',
-  },
-  section: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
   },
 });

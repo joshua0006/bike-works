@@ -1,43 +1,67 @@
+import { useState } from 'react';
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform } from 'react-native';
-
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/context/ThemeContext';
+import type { BusinessSettings } from '@/types';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { primary, colors } = useTheme();
+  const [features] = useState<BusinessSettings['features']>({
+    sales: true,
+    jobs: true,
+  });
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
+    <Tabs screenOptions={{
+      tabBarActiveTintColor: primary,
+      tabBarInactiveTintColor: '#64748b',
+      tabBarStyle: {
+        backgroundColor: colors.surface,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+      },
+      headerStyle: {
+        backgroundColor: colors.surface,
+      },
+      headerTitleStyle: {
+        color: colors.text,
+        fontSize: 18,
+        fontWeight: '600',
+      },
+    }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Sales',
+          tabBarIcon: ({ color }) => <Ionicons name="cart" color={color} size={24} />
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="bikes"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Bikes',
+          tabBarIcon: ({ color }) => <Ionicons name="bicycle" color={color} size={24} />
+        }}
+      />
+      <Tabs.Screen
+        name="jobs"
+        options={{
+          title: 'Jobs',
+          tabBarIcon: ({ color }) => <Ionicons name="construct" color={color} size={24} />
+        }}
+      />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          title: 'Clients',
+          tabBarIcon: ({ color }) => <Ionicons name="people" color={color} size={24} />
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <Ionicons name="settings" color={color} size={24} />
         }}
       />
     </Tabs>
