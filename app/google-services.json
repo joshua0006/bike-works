@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "801348189808",
+    "project_id": "bikeworks-au",
+    "storage_bucket": "bikeworks-au.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:801348189808:android:e57811f3e5e065e1df3eb5",
+        "android_client_info": {
+          "package_name": "com.jezweb.bikeworksau"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTnwnbijSWck138yS4zDNJCaQIZF2G7qA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ], 
+
+  "configuration_version": "1"
+}

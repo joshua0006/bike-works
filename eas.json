@@ -6,25 +6,29 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "gradleCommand": ":app:assembleDebug"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "distribution": "internal"
     },
     "production": {
       "autoIncrement": true,
-      "android": {
-        "buildType": "app-bundle"
+      "ios": {
+        "simulator": false,
+        "enterpriseProvisioning": "universal",
+        "credentialsSource": "remote",
+        "distribution": "store",
+        "image": "latest"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "joshua@jezweb.com",
+        "ascAppId": "6742209768",
+        "appleTeamId": "NX349PS8RE"
+      }
+    }
   }
 }

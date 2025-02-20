@@ -20,6 +20,7 @@ import { PhotoMatcher } from './PhotoMatcher';
 import { PhotoUpload } from './PhotoUpload';
 import type { Bike, Client, Sale, Purchase } from '../../types';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { StepIndicator } from '../common/StepIndicator';
 
 type FormStep = 'bike-details' | 'photo-upload' | 'sale-details' | 'review';
 
@@ -198,13 +199,27 @@ export function SalesForm() {
   }
 
   return (
-    <><Pressable
-    style={styles.exitButton}
-    onPress={() => router.push('/')}
-  >
-    <Ionicons name="arrow-back" size={20} color="#64748b" />
-    <Text style={styles.exitButtonText}>New Sale</Text>
-  </Pressable>
+    <>
+    
+    <View style={styles.stepIndicatorContainer}>
+      <StepIndicator
+        steps={steps}
+        currentStep={step}
+        labels={{
+          'bike-details': 'Bike Info',
+          'photo-upload': 'Photos',
+          'sale-details': 'Sale Details',
+          'review': 'Review'
+        }}
+        onStepPress={(targetStep) => {
+          const currentIndex = steps.indexOf(step);
+          const targetIndex = steps.indexOf(targetStep);
+          if (targetIndex < currentIndex) {
+            setStep(targetStep);
+          }
+        }}
+      />
+    </View>
     <ScrollView style={styles.container}>
       <View style={styles.navigationContainer}>
         
@@ -307,14 +322,16 @@ const styles = StyleSheet.create({
   exitButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    padding: 8,
+    gap: 8,
+    padding: 12,
     backgroundColor: '#f1f5f9',
     borderRadius: 8,
+    margin: 16,
+    marginBottom: 0,
   },
   exitButtonText: {
     color: '#64748b',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
   },
   backButton: {
@@ -327,5 +344,12 @@ const styles = StyleSheet.create({
     color: '#3b82f6',
     fontSize: 14,
     fontWeight: '500',
+  },
+  stepIndicatorContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
 }); 

@@ -8,6 +8,7 @@
  * - steps: string[] - Array of step identifiers
  * - currentStep: string - Current active step
  * - labels: Record<string, string> - Human-readable labels for steps
+ * - onStepPress?: (step: string) => void - Optional function to handle step presses
  * 
  * Features:
  * - Visual progress indication
@@ -15,25 +16,43 @@
  * - Completion status
  */
 
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Props {
   steps: string[];
   currentStep: string;
   labels: Record<string, string>;
+  onStepPress?: (step: string) => void;
 }
 
-export function StepIndicator({ steps, currentStep, labels }: Props) {
+export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props) {
   const currentIndex = steps.indexOf(currentStep);
 
   return (
+    <>
+    <Pressable
+    style={styles.exitButton}
+    onPress={() => router.push('/')}
+  >
+    <Ionicons name="arrow-back" size={20} color="#64748b" />
+    <Text style={styles.exitButtonText}>Back to Sales</Text>
+  </Pressable>
     <View style={styles.container}>
       {steps.map((step, index) => {
         const isActive = index === currentIndex;
         const isCompleted = index < currentIndex;
+        const isNavigable = index <= currentIndex;
 
         return (
-          <View key={step} style={styles.stepContainer}>
+          <TouchableOpacity
+            key={step}
+            style={styles.stepContainer}
+            onPress={() => onStepPress?.(step)}
+            disabled={!onStepPress || !isNavigable}
+            activeOpacity={0.7}
+          >
             <View
               style={[
                 styles.line,
@@ -60,14 +79,16 @@ export function StepIndicator({ steps, currentStep, labels }: Props) {
                 styles.label,
                 isActive && styles.labelActive,
                 isCompleted && styles.labelCompleted,
+                isNavigable && onStepPress && styles.clickableLabel,
               ]}
             >
               {labels[step]}
             </Text>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </View>
+    </>
   );
 }
 
@@ -126,6 +147,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   labelCompleted: {
+    color: '#2563eb',
+  },
+  clickableLabel: {
+    textDecorationLine: 'underline',
+  },
+  exitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 16,
+    marginLeft: 16,
+    marginTop: 16,
+
+
+  },
+  exitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#2563eb',
   },
 });

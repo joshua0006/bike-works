@@ -1,0 +1,10 @@
+# Ignore native directories when using prebuild
+android/
+ios/
+
+# Default ignores
+node_modules/
+**/ios/
+**/android/
+**/expo/
+dist/ 
