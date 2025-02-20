@@ -72,7 +72,13 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to upload job sheets",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan job sheets"
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

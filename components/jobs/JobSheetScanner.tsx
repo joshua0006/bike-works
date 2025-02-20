@@ -14,7 +14,7 @@
  * - Data parsing and structuring
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import type { Job } from '../../types';
 import { GOOGLE_API_KEY } from '../../config';
-import { encode as base64Encode } from 'base-64';
+
+interface OCRResponse {
+  candidates: Array<{
+    content: {
+      parts: Array<{
+        text: string;
+      }>;
+    };
+  }>;
+}
 
 interface Props {
   onComplete: (data: Partial<Job>) => void;
@@ -38,143 +47,114 @@ export function JobSheetScanner({ onComplete }: Props) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    (async () => {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Camera permission is required to scan job sheets');
+      }
+    })();
+  }, []);
+
   const takePhoto = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 1,
-        allowsEditing: true,
         aspect: [3, 4],
+        base64: true, // This will give us the base64 string directly
       });
 
-      if (!result.canceled) {
-        setPhoto(result.assets[0].uri);
-        processJobSheet(result.assets[0].uri);
+      if (result.canceled || !result.assets[0].base64) {
+        throw new Error('Failed to capture image');
       }
-    } catch (err) {
-      setError('Failed to take photo. Please try again.');
-    }
-  };
 
-  const processJobSheet = async (imageUri: string) => {
-    setIsProcessing(true);
-    setError(null);
+      const base64Image = result.assets[0].base64;
 
-    try {
-      // 1. Convert image to base64
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      
-      const base64String = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            const base64Data = reader.result.split(',')[1];
-            resolve(base64Data);
-          } else {
-            reject(new Error('Failed to read image data'));
-          }
-        };
-        reader.readAsDataURL(blob);
-      });
-
-      // 2. Prepare the Gemini API request
-      const requestBody = {
-        contents: [{
-          parts: [{
-            text: `Analyze this Breakaway Cycles workshop job sheet and extract the following information in JSON format:
-            {
-              "customerName": string (from "Customer" field),
-              "customerPhone": string (from "Phone" field, format as 04XX XXX XXX),
-              "bikeModel": string (from "Bike Model" field),
-              "dateIn": string (from "Date In" field, format as DD/MM/YYYY),
-              "workRequired": string (from "WORK REQUIRED" section),
-              "workDone": string (combine all items from "WORK DONE / PARTS SUPPLIED" section),
-              "laborCost": number (from "plus Labour" field),
-              "partsCost": number (sum of all parts/work costs before labour),
-              "totalCost": number (from "TOTAL incl. GST" field),
-              "notes": string (from "NOTES" field)
-            }
-
-            Important details:
-            - Phone numbers should maintain their exact format
-            - Preserve all work items exactly as written
-            - Include all costs as numbers without the $ symbol
-            - Combine all work done items into a single string, separated by newlines
-            
-            Example of expected format for this job sheet:
-            {
-              "customerName": "John Jerrime",
-              "customerPhone": "0411 056 876",
-              "bikeModel": "Trek Marlin 7",
-              "dateIn": "14/6/2023",
-              "workRequired": "Fork service - check over bike",
-              "workDone": "Prepaid work done on gearing\nFork Service\nHub clean Regress (looking for free hub)\nTighten head set Adjusted gears\nChecked brakes/pads",
-              "laborCost": 80,
-              "partsCost": 210,
-              "totalCost": 290,
-              "notes": "S/T 27/6/2023"
-            }`
-          }, {
-            inline_data: {
-              mime_type: "image/jpeg",
-              data: base64String
-            }
-          }]
-        }]
-      };
-
-      // 3. Make API request to Gemini
+      // Make API request to Gemini 2.0
       const apiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${GOOGLE_API_KEY}`,
+        'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-goog-api-key': GOOGLE_API_KEY,
           },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [{
+                text: `Extract the following information from this job sheet image and return it as a JSON object:
+                - Customer Name
+                - Phone Number
+                - Bike Model
+                - Date In
+                - Work Required
+                - Work Done items with costs
+                - Labor Cost
+                - Total Cost including GST
+
+                Format as:
+                {
+                  "customerName": string,
+                  "customerPhone": string,
+                  "bikeModel": string,
+                  "dateIn": string,
+                  "workRequired": string,
+                  "workDone": string,
+                  "laborCost": number,
+                  "totalCost": number
+                }`
+              }, {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: base64Image
+                }
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              topP: 0.8,
+              topK: 40,
+              maxOutputTokens: 8192,
+            }
+          })
         }
       );
 
       if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        console.error('API Error:', errorText);
         throw new Error(`API error: ${apiResponse.status}`);
       }
 
-      const responseData = await apiResponse.json();
-      const textResponse = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!textResponse) {
+      const data = await apiResponse.json() as OCRResponse;
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!text) {
         throw new Error('No text found in response');
       }
 
-      // 4. Parse the JSON response
-      const jsonStart = textResponse.indexOf('{');
-      const jsonEnd = textResponse.lastIndexOf('}') + 1;
-      const jsonString = textResponse.slice(jsonStart, jsonEnd);
-      const parsedData = JSON.parse(jsonString);
-
-      // 5. Validate required fields
-      const requiredFields = ['customerName', 'customerPhone', 'bikeModel', 'workRequired'];
-      const missingFields = requiredFields.filter(field => !parsedData[field]);
-      
-      if (missingFields.length > 0) {
-        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      // Extract JSON from response text
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
       }
 
-      // 6. Format phone number
-      if (parsedData.customerPhone) {
-        parsedData.customerPhone = parsedData.customerPhone.replace(/\D/g, '');
-        if (parsedData.customerPhone.length === 10) {
-          parsedData.customerPhone = parsedData.customerPhone.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3');
-        }
+      const parsedData = JSON.parse(jsonMatch[0]);
+
+      // Validate the parsed data
+      if (!parsedData.customerName || !parsedData.customerPhone) {
+        throw new Error('Missing required fields in response');
       }
 
-      // 7. Pass data to parent component
       onComplete(parsedData);
-
     } catch (err) {
       console.error('Processing error:', err);
-      setError('Failed to process job sheet. Please ensure the photo is clear and contains a valid job sheet. Error: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setError(
+        'Failed to process job sheet. Please ensure the photo is clear and contains a valid job sheet. ' +
+        'Error: ' + (err instanceof Error ? err.message : 'Unknown error')
+      );
     } finally {
       setIsProcessing(false);
     }
