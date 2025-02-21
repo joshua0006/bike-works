@@ -116,13 +116,7 @@ export function ClientForm({ initialData = {}, onSubmit }: Props) {
   };
 
   return (
-    <><Pressable 
-        style={[styles.backButton, { backgroundColor: '#f1f5f9' }]}
-        onPress={() => router.push('/clients')}
-      >
-        <Ionicons name="arrow-back" size={20} color="#64748b" />
-        <Text style={styles.backButtonText}>Back to Clients</Text>
-      </Pressable>
+   
     <ScrollView style={styles.container}>
       
 
@@ -194,7 +188,7 @@ export function ClientForm({ initialData = {}, onSubmit }: Props) {
         )}
       </Pressable>
     </ScrollView>
-    </>
+   
   );
 }
 

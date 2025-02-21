@@ -31,15 +31,14 @@ interface Props {
 export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props) {
   const currentIndex = steps.indexOf(currentStep);
 
+  const handleStepPress = (step: string) => {
+    console.log('Step pressed:', step);
+    console.log('Current step:', currentStep);
+    console.log('Is step navigable:', steps.indexOf(step) <= currentIndex);
+    onStepPress?.(step);
+  };
+
   return (
-    <>
-    <Pressable
-    style={styles.exitButton}
-    onPress={() => router.push('/')}
-  >
-    <Ionicons name="arrow-back" size={20} color="#64748b" />
-    <Text style={styles.exitButtonText}>Back to Sales</Text>
-  </Pressable>
     <View style={styles.container}>
       {steps.map((step, index) => {
         const isActive = index === currentIndex;
@@ -50,7 +49,7 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
           <TouchableOpacity
             key={step}
             style={styles.stepContainer}
-            onPress={() => onStepPress?.(step)}
+            onPress={() => handleStepPress(step)}
             disabled={!onStepPress || !isNavigable}
             activeOpacity={0.7}
           >
@@ -58,7 +57,7 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
               style={[
                 styles.line,
                 index === 0 && styles.lineHidden,
-                isCompleted && styles.lineCompleted,
+                (isCompleted || isActive) && styles.lineCompleted,
               ]}
             />
             <View
@@ -72,15 +71,15 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
               style={[
                 styles.line,
                 index === steps.length - 1 && styles.lineHidden,
-                isCompleted && styles.lineCompleted,
+                (isCompleted || isActive) && styles.lineCompleted,
               ]}
             />
             <Text
               style={[
                 styles.label,
                 isActive && styles.labelActive,
-                isCompleted && styles.labelCompleted,
-                isNavigable && onStepPress && styles.clickableLabel,
+                (isCompleted || isActive) && styles.labelCompleted,
+                onStepPress && styles.clickableLabel,
               ]}
             >
               {labels[step]}
@@ -89,7 +88,6 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
         );
       })}
     </View>
-    </>
   );
 }
 

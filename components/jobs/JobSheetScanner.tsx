@@ -27,6 +27,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import type { Job } from '../../types';
 import { GOOGLE_API_KEY } from '../../config';
+import { addDoc, collection } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { router } from 'expo-router';
 
 interface OCRResponse {
   candidates: Array<{
@@ -48,12 +51,38 @@ export function JobSheetScanner({ onComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    const initializeCamera = async () => {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         setError('Camera permission is required to scan job sheets');
+        return;
       }
-    })();
+      
+      // Automatically open camera after permissions
+      try {
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 1,
+          aspect: [3, 4],
+          base64: true,
+        });
+
+        if (result.canceled) {
+          router.back(); // Go back if user cancels camera
+          return;
+        }
+
+        if (result.assets[0]) {
+          setPhoto(result.assets[0].uri);
+          await processJobSheet(result.assets[0].uri);
+        }
+      } catch (err) {
+        console.error('Camera error:', err);
+        setError('Failed to access camera');
+      }
+    };
+
+    initializeCamera();
   }, []);
 
   const takePhoto = async () => {
@@ -148,7 +177,20 @@ export function JobSheetScanner({ onComplete }: Props) {
         throw new Error('Missing required fields in response');
       }
 
-      onComplete(parsedData);
+      // Format the data
+      const jobData = {
+        ...parsedData,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to Firebase
+      const docRef = await addDoc(collection(db, 'jobs'), jobData);
+      console.log('Job saved with ID:', docRef.id);
+
+      // Navigate back to jobs list
+      router.back();
     } catch (err) {
       console.error('Processing error:', err);
       setError(
@@ -162,38 +204,13 @@ export function JobSheetScanner({ onComplete }: Props) {
 
   return (
     <View style={styles.container}>
-      {!photo ? (
-        <Pressable
-          style={styles.captureButton}
-          onPress={takePhoto}
-        >
-          <Ionicons name="camera" size={48} color="#64748b" />
-          <Text style={styles.captureText}>Take Photo of Job Sheet</Text>
-          <Text style={styles.captureSubtext}>
-            Position the job sheet within the frame and ensure good lighting
-          </Text>
-        </Pressable>
-      ) : (
-        <View style={styles.previewContainer}>
-          <Image
-            source={{ uri: photo }}
-            style={styles.preview}
-            resizeMode="contain"
-          />
-          {isProcessing && (
-            <View style={styles.processingOverlay}>
-              <ActivityIndicator size="large" color="#2563eb" />
-              <Text style={styles.processingText}>
-                Processing Job Sheet...
-              </Text>
-            </View>
-          )}
+      {isProcessing && (
+        <View style={styles.processingOverlay}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.processingText}>Processing Job Sheet...</Text>
         </View>
       )}
-
-      {error && (
-        <Text style={styles.errorText}>{error}</Text>
-      )}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }

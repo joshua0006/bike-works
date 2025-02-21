@@ -288,10 +288,7 @@ export function ClientList() {
                   
                   {editMode && (
                     <View style={styles.bikeSelectorContainer}>
-                      <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Associated Bikes</Text>
-                        <AddBikeButton clientId={selectedClient?.id} />
-                      </View>
+                      
                       <BikeSelector
                         selectedBikes={editedData.bikeSerialNumbers || []}
                         onChange={(serials) => {

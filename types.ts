@@ -1,4 +1,3 @@
-
 export type Client = {
   id: string;
   name: string;
@@ -18,21 +17,18 @@ export type Sale = {
 };
 
 export interface Job {
-  id?: string; // Firestore document ID
+  id?: string;
   customerName: string;
   customerPhone: string;
   bikeModel: string;
+  dateIn: string;
   workRequired: string;
-  workDone?: string;
+  workDone: string;
   laborCost: number;
-  partsCost: number;
   totalCost: number;
-  notes?: string;
-  status: 'pending' | 'in-progress' | 'completed';
-  createdAt: Date;
-  updatedAt: Date;
-  dateIn?: string; // Add optional dateIn field
-  // Add other fields as needed
+  status: 'pending' | 'in_progress' | 'completed';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BusinessSettings {

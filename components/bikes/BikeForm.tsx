@@ -91,16 +91,7 @@ export function BikeForm({ initialData = {}, onSubmit }: Props) {
   };
 
   return (
-    <><Pressable 
-    style={[styles.backButton, { backgroundColor: colors.surface }]}
-    onPress={() => router.push('/bikes')}
-  >
-    <Ionicons name="arrow-back" size={20} color={colors.text} />
-    <Text style={[styles.backButtonText, { color: colors.text }]}>New Bike</Text>
-  </Pressable>
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      
-
       <SerialLookup
         value={formData.serialNumber}
         onChange={(serialNumber) => setFormData(prev => ({ ...prev, serialNumber }))}
@@ -251,7 +242,6 @@ export function BikeForm({ initialData = {}, onSubmit }: Props) {
         )}
       </Pressable>
     </ScrollView>
-    </>
   );
 }
 
@@ -302,17 +292,5 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.6,
     backgroundColor: '#94a3b8',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 20,
-    marginBottom: 16,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
   },
 });
