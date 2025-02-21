@@ -22,6 +22,7 @@ import {
   Image,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,38 +52,16 @@ export function JobSheetScanner({ onComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const initializeCamera = async () => {
+    const requestPermissionsAndOpenCamera = async () => {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        setError('Camera permission is required to scan job sheets');
+        Alert.alert('Permission required', 'Camera access is needed to scan job sheets');
         return;
       }
-      
-      // Automatically open camera after permissions
-      try {
-        const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 1,
-          aspect: [3, 4],
-          base64: true,
-        });
-
-        if (result.canceled) {
-          router.back(); // Go back if user cancels camera
-          return;
-        }
-
-        if (result.assets[0]) {
-          setPhoto(result.assets[0].uri);
-          await processJobSheet(result.assets[0].uri);
-        }
-      } catch (err) {
-        console.error('Camera error:', err);
-        setError('Failed to access camera');
-      }
+      takePhoto();
     };
 
-    initializeCamera();
+    requestPermissionsAndOpenCamera();
   }, []);
 
   const takePhoto = async () => {
@@ -204,13 +183,38 @@ export function JobSheetScanner({ onComplete }: Props) {
 
   return (
     <View style={styles.container}>
-      {isProcessing && (
-        <View style={styles.processingOverlay}>
-          <ActivityIndicator size="large" />
-          <Text style={styles.processingText}>Processing Job Sheet...</Text>
+      {!photo ? (
+        <Pressable
+          style={styles.captureButton}
+          onPress={takePhoto}
+        >
+          <Ionicons name="camera" size={48} color="#64748b" />
+          <Text style={styles.captureText}>Take Photo of Job Sheet</Text>
+          <Text style={styles.captureSubtext}>
+            Position the job sheet within the frame and ensure good lighting
+          </Text>
+        </Pressable>
+      ) : (
+        <View style={styles.previewContainer}>
+          <Image
+            source={{ uri: photo }}
+            style={styles.preview}
+            resizeMode="contain"
+          />
+          {isProcessing && (
+            <View style={styles.processingOverlay}>
+              <ActivityIndicator size="large" color="#2563eb" />
+              <Text style={styles.processingText}>
+                Processing Job Sheet...
+              </Text>
+            </View>
+          )}
         </View>
       )}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      {error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
     </View>
   );
 }
