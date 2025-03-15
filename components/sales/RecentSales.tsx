@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Modal, TouchableOpacity, Image, Pressable, Animated, Dimensions, NativeSyntheticEvent, NativeScrollEvent, Linking, FlatList } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Modal, TouchableOpacity, Image, Pressable, Animated, Dimensions, NativeSyntheticEvent, NativeScrollEvent, Linking, FlatList, Platform } from 'react-native';
 import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,16 +21,200 @@ interface SaleData {
   status: string;
 }
 
+// Full-screen photo viewer modal component
+const FullScreenPhotoViewer = ({ 
+  photos, 
+  initialIndex = 0, 
+  visible, 
+  onClose 
+}: { 
+  photos: string[], 
+  initialIndex?: number, 
+  visible: boolean, 
+  onClose: () => void 
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const flatListRef = useRef<FlatList>(null);
+
+  const { width, height } = Dimensions.get('window');
+
+  useEffect(() => {
+    if (visible) {
+      // When opening, animate fade in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      
+      // Scroll to initial photo
+      flatListRef.current?.scrollToIndex({
+        index: initialIndex,
+        animated: false,
+      });
+      setCurrentIndex(initialIndex);
+    }
+  }, [visible, initialIndex]);
+
+  const handleClose = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+    });
+  };
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(contentOffsetX / width);
+    if (newIndex !== currentIndex) {
+      setCurrentIndex(newIndex);
+    }
+  };
+
+  const renderPhoto = ({ item }: { item: string }) => (
+    <View style={{ width, height: height * 0.8, padding: 0 }}>
+      <Image
+        source={{ uri: item }}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="contain"
+      />
+    </View>
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="none"
+      onRequestClose={handleClose}
+    >
+      <Animated.View style={[styles.fullscreenModalBackdrop, { opacity: fadeAnim }]}>
+        <FlatList
+          ref={flatListRef}
+          data={photos}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          renderItem={renderPhoto}
+          keyExtractor={(_, index) => `fullscreen-photo-${index}`}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          getItemLayout={(_, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
+          initialScrollIndex={initialIndex}
+          decelerationRate="fast"
+          removeClippedSubviews={true}
+        />
+        
+        {/* Photo counter */}
+        <View style={styles.photoCounter}>
+          <Text style={styles.photoCounterText}>
+            {currentIndex + 1} / {photos.length}
+          </Text>
+        </View>
+
+        {/* Close button */}
+        <TouchableOpacity
+          style={styles.fullscreenCloseButton}
+          onPress={handleClose}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={24} color="#fff" />
+        </TouchableOpacity>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+// Component for the photo grid in sale cards
+const SalePhotoGrid = ({ photos }: { photos: string[] }) => {
+  const [fullscreenVisible, setFullscreenVisible] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const { width } = Dimensions.get('window');
+  const gridWidth = width * 0.9 - 32; // 90% of screen width minus card padding
+  
+  // Calculate thumbnail dimensions to fit nicely in a grid
+  const numColumns = photos.length === 1 ? 1 : Math.min(photos.length, 3);
+  const gap = 4;
+  const thumbnailSize = photos.length === 1 
+    ? gridWidth 
+    : (gridWidth - (gap * (numColumns - 1))) / numColumns;
+  
+  // For single images, use a more pleasing aspect ratio (16:9)
+  const singleImageHeight = photos.length === 1 ? gridWidth * 0.6 : thumbnailSize;
+  
+  if (photos.length === 0) {
+    return (
+      <View style={[styles.photoGridContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: '#94a3b8' }}>No photos available</Text>
+      </View>
+    );
+  }
+
+  const openFullscreen = (index: number = 0) => {
+    setSelectedPhotoIndex(index);
+    setFullscreenVisible(true);
+  };
+
+  return (
+    <>
+      <View style={styles.photoGridContainer}>
+        <View style={styles.photoGrid}>
+          {photos.slice(0, 6).map((photo, index) => (
+            <View
+              key={`photo-${index}`}
+              style={[
+                styles.gridItem,
+                {
+                  width: thumbnailSize,
+                  height: index === 0 && photos.length === 1 ? singleImageHeight : thumbnailSize,
+                  marginRight: (index + 1) % numColumns === 0 ? 0 : gap,
+                  marginBottom: index < photos.length - numColumns ? gap : 0
+                }
+              ]}
+            >
+              <Image
+                source={{ uri: photo }}
+                style={styles.gridImage}
+                resizeMode={photos.length === 1 ? "contain" : "cover"}
+              />
+              {index === 5 && photos.length > 6 && (
+                <View style={styles.morePhotosOverlay}>
+                  <Text style={styles.morePhotosText}>+{photos.length - 6}</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+        
+      </View>
+      
+      <FullScreenPhotoViewer
+        photos={photos}
+        initialIndex={selectedPhotoIndex}
+        visible={fullscreenVisible}
+        onClose={() => setFullscreenVisible(false)}
+      />
+    </>
+  );
+};
+
 export function RecentSales() {
   const [sales, setSales] = useState<SaleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedSale, setSelectedSale] = useState<SaleData | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [fullscreenPhotosVisible, setFullscreenPhotosVisible] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   useEffect(() => {
     const fetchRecentSales = async () => {
@@ -79,26 +263,19 @@ export function RecentSales() {
     }).start(() => setModalVisible(false));
   };
 
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
-  );
-
-  useEffect(() => {
-    const listener = scrollX.addListener(({ value }) => {
-      const index = Math.round(value / Dimensions.get('window').width);
-      setActivePhotoIndex(index);
-    });
-
-    return () => scrollX.removeListener(listener);
-  }, [scrollX]);
+  const openFullscreenFromModal = (index: number) => {
+    if (selectedSale?.photos) {
+      setSelectedPhotoIndex(index);
+      setFullscreenPhotosVisible(true);
+    }
+  };
 
   const renderSaleItem = ({ item }: { item: SaleData }) => (
-    <Pressable onPress={() => {
-      setModalVisible(true);
-      openModal(item);
-    }}>
+    <Pressable onPress={() => openModal(item)}>
       <View style={styles.saleCard}>
+        {/* Photo Grid */}
+        <SalePhotoGrid photos={item.photos || []} />
+        
         <Text style={styles.clientName}>{item.clientName}</Text>
         <Text style={styles.saleInfo}>
           Date: {new Date(item.dateSold).toLocaleDateString()}
@@ -131,14 +308,34 @@ export function RecentSales() {
 
   return (
     <>
-      <ScrollView style={styles.container}>
-        {sales.map((sale) => renderSaleItem({ item: sale }))}
+      <ScrollView contentContainerStyle={styles.container}>
+        {sales.map((item) => (
+          <Pressable 
+            key={`sale-${item.id}`} 
+            onPress={() => openModal(item)}
+          >
+            <View style={styles.saleCard}>
+              <SalePhotoGrid photos={item.photos || []} />
+              <Text style={styles.clientName}>{item.clientName}</Text>
+              <Text style={styles.saleInfo}>
+                Date: {new Date(item.dateSold).toLocaleDateString()}
+              </Text>
+              <Text style={styles.saleInfo}>Price: ${item.price}</Text>
+              <Text style={styles.saleInfo}>Status: {item.status}</Text>
+              <Text style={styles.saleInfo}>Sold By: {item.soldBy}</Text>
+              <Text style={styles.contact}>
+                📞 {item.clientPhone} | ✉️ {item.clientEmail}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
       </ScrollView>
 
+      {/* Sale Details Modal */}
       <Modal
         visible={modalVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={closeModal}
       >
         <Animated.View style={[styles.modalBackdrop, { opacity: fadeAnim }]}>
@@ -146,61 +343,66 @@ export function RecentSales() {
             style={styles.modalBackdrop}
             onPress={closeModal}
           >
-            <View style={styles.modalContainer}>
+            <TouchableOpacity 
+              activeOpacity={1} 
+              style={styles.modalContainer}
+              onPress={(e) => e.stopPropagation()}
+            >
               <Animated.View 
                 style={[styles.modalContent, { opacity: fadeAnim }]}
-                onStartShouldSetResponder={() => true}
               >
                 <View style={styles.carouselContainer}>
-                  <FlatList
-                    horizontal
-                    pagingEnabled
-                    data={selectedSale?.photos}
-                    renderItem={({ item }) => (
-                      <Image
-                        source={{ uri: item }}
-                        style={styles.carouselImage}
-                        resizeMode="cover"
-                      />
-                    )}
-                    keyExtractor={(item, index) => `${index}-${item}`}
-                    showsHorizontalScrollIndicator={false}
-                    onScroll={handleScroll}
-                    scrollEventThrottle={16}
-                  />
-                  {selectedSale?.photos?.length > 1 && (
-                    <View style={styles.pagination}>
-                      {selectedSale.photos.map((photo, index) => (
-                        <View
-                          key={`${index}-${photo}`}
+                  <View style={styles.modalPhotoGridContainer}>
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' }}
+                      snapToInterval={(selectedSale?.photos?.length === 1) ? Dimensions.get('window').width - 32 : 276}
+                      decelerationRate="fast"
+                    >
+                      {(selectedSale?.photos || []).map((photo, index) => (
+                        <TouchableOpacity
+                          key={`modal-thumb-${index}`}
                           style={[
-                            styles.dot,
-                            activePhotoIndex === index && styles.activeDot
+                            styles.modalThumb,
+                            selectedSale?.photos?.length === 1 && {
+                              width: Dimensions.get('window').width - 32,
+                              height: 260,
+                              marginHorizontal: 0
+                            }
                           ]}
-                        />
+                          onPress={() => openFullscreenFromModal(index)}
+                        >
+                          <Image
+                            source={{ uri: photo }}
+                            style={styles.modalThumbImage}
+                            resizeMode="cover"
+                          />
+                        </TouchableOpacity>
                       ))}
-                    </View>
-                  )}
+                    </ScrollView>
+                  </View>
                 </View>
 
                 <ScrollView 
                   style={styles.content}
                   contentContainerStyle={styles.contentPadding}
+                  nestedScrollEnabled={true}
                 >
                   <View style={styles.header}>
-                    <Text style={styles.clientName}>{selectedSale?.clientName}</Text>
+                    <Text style={styles.clientName}>{selectedSale?.clientName || ''}</Text>
                     <Text style={styles.saleDate}>
-                      {new Date(selectedSale?.dateSold).toLocaleDateString()}
+                      {selectedSale?.dateSold ? new Date(selectedSale.dateSold).toLocaleDateString() : ''}
                     </Text>
                   </View>
 
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>${selectedSale?.price}</Text>
+                      <Text style={styles.statValue}>${selectedSale?.price || 0}</Text>
                       <Text style={styles.statLabel}>Amount</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{selectedSale?.soldBy}</Text>
+                      <Text style={styles.statValue}>{selectedSale?.soldBy || 'Unknown'}</Text>
                       <Text style={styles.statLabel}>Sold By</Text>
                     </View>
                   </View>
@@ -216,24 +418,24 @@ export function RecentSales() {
                       size={20}
                       color="white"
                     />
-                    <Text style={styles.statusText}>{selectedSale?.status}</Text>
+                    <Text style={styles.statusText}>{selectedSale?.status || 'Pending'}</Text>
                   </View>
 
                   <View style={styles.contactSection}>
                     <Text style={styles.sectionTitle}>Contact</Text>
                     <Pressable
                       style={styles.contactButton}
-                      onPress={() => Linking.openURL(`tel:${selectedSale?.clientPhone}`)}
+                      onPress={() => Linking.openURL(`tel:${selectedSale?.clientPhone || ''}`)}
                     >
                       <Ionicons name="call" size={20} color="white" />
-                      <Text style={styles.contactButtonText}>{selectedSale?.clientPhone}</Text>
+                      <Text style={styles.contactButtonText}>{selectedSale?.clientPhone || 'N/A'}</Text>
                     </Pressable>
                     <Pressable
                       style={styles.contactButton}
-                      onPress={() => Linking.openURL(`mailto:${selectedSale?.clientEmail}`)}
+                      onPress={() => Linking.openURL(`mailto:${selectedSale?.clientEmail || ''}`)}
                     >
                       <Ionicons name="mail" size={20} color="white" />
-                      <Text style={styles.contactButtonText}>{selectedSale?.clientEmail}</Text>
+                      <Text style={styles.contactButtonText}>{selectedSale?.clientEmail || 'N/A'}</Text>
                     </Pressable>
                   </View>
                 </ScrollView>
@@ -245,17 +447,27 @@ export function RecentSales() {
                   <Ionicons name="close" size={24} color="#64748b" />
                 </Pressable>
               </Animated.View>
-            </View>
+            </TouchableOpacity>
           </Pressable>
         </Animated.View>
       </Modal>
+
+      {/* Fullscreen Photos Modal from Modal View */}
+      {selectedSale && (
+        <FullScreenPhotoViewer
+          photos={selectedSale.photos || []}
+          initialIndex={selectedPhotoIndex}
+          visible={fullscreenPhotosVisible}
+          onClose={() => setFullscreenPhotosVisible(false)}
+        />
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 20,
@@ -302,53 +514,95 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
   },
+  // Photo Grid Styles
+  photoGridContainer: {
+    marginBottom: 12,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  gridItem: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  morePhotosOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  morePhotosText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 18,
+  },
+  viewAllButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+  },
+  viewAllButtonText: {
+    fontSize: 14,
+    color: '#3b82f6',
+    fontWeight: '500',
+  },
+  // Modal Styles
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
-    width: '90%',
-    maxWidth: 400,
+    width: '100%',
     maxHeight: '90%',
     alignSelf: 'center',
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 16,
+    borderRadius: 0,
     overflow: 'hidden',
+    width: '100%',
   },
   carouselContainer: {
-    height: 240,
+    height: 280,
     backgroundColor: '#000',
-  },
-  carouselImage: {
-    width: Dimensions.get('window').width * 0.9,
-    height: 240,
-  },
-  pagination: {
-    position: 'absolute',
-    bottom: 16,
-    flexDirection: 'row',
+    position: 'relative',
+    overflow: 'hidden',
     justifyContent: 'center',
+  },
+  modalPhotoGridContainer: {
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
     width: '100%',
-    gap: 6,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+  modalThumb: {
+    height: 260,
+    width: 260,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    overflow: 'hidden',
   },
-  activeDot: {
-    backgroundColor: '#3b82f6',
-    width: 20,
+  modalThumbImage: {
+    height: '100%',
+    width: '100%',
   },
   content: {
     maxHeight: Dimensions.get('window').height * 0.6,
   },
   contentPadding: {
-    padding: 16,
+    padding: 24,
   },
   header: {
     marginBottom: 20,
@@ -424,7 +678,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: 16,
+    top: Platform.OS === 'ios' ? 48 : 16,
     right: 16,
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 20,
@@ -433,5 +687,33 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    zIndex: 10,
+  },
+  // Fullscreen Photo Viewer
+  fullscreenModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 10,
+  },
+  photoCounter: {
+    position: 'absolute',
+    bottom: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+  },
+  photoCounterText: {
+    color: 'white',
+    fontWeight: '600',
   },
 }); 

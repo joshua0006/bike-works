@@ -14,6 +14,7 @@
  * - Visual progress indication
  * - Step labels
  * - Completion status
+ * - Navigation to previous steps
  */
 
 import React from 'react';
@@ -32,10 +33,16 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
   const currentIndex = steps.indexOf(currentStep);
 
   const handleStepPress = (step: string) => {
+    const stepIndex = steps.indexOf(step);
+    const isNavigable = stepIndex <= currentIndex;
+    
     console.log('Step pressed:', step);
     console.log('Current step:', currentStep);
-    console.log('Is step navigable:', steps.indexOf(step) <= currentIndex);
-    onStepPress?.(step);
+    console.log('Is step navigable:', isNavigable);
+    
+    if (isNavigable && onStepPress) {
+      onStepPress(step);
+    }
   };
 
   return (
@@ -48,7 +55,10 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
         return (
           <TouchableOpacity
             key={step}
-            style={styles.stepContainer}
+            style={[
+              styles.stepContainer,
+              isNavigable && onStepPress && styles.navigableStep
+            ]}
             onPress={() => handleStepPress(step)}
             disabled={!onStepPress || !isNavigable}
             activeOpacity={0.7}
@@ -65,8 +75,16 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
                 styles.dot,
                 isActive && styles.dotActive,
                 isCompleted && styles.dotCompleted,
+                isNavigable && onStepPress && styles.navigableDot
               ]}
-            />
+            >
+              {isCompleted && (
+                <Ionicons name="checkmark" size={16} color="#ffffff" />
+              )}
+              {isNavigable && !isCompleted && !isActive && onStepPress && (
+                <Ionicons name="arrow-back" size={14} color="#2563eb" />
+              )}
+            </View>
             <View
               style={[
                 styles.line,
@@ -79,11 +97,14 @@ export function StepIndicator({ steps, currentStep, labels, onStepPress }: Props
                 styles.label,
                 isActive && styles.labelActive,
                 (isCompleted || isActive) && styles.labelCompleted,
-                onStepPress && styles.clickableLabel,
+                isNavigable && onStepPress && styles.navigableLabel,
               ]}
             >
               {labels[step]}
             </Text>
+            {isNavigable && !isActive && onStepPress && (
+              <Text style={styles.editHint}>Tap to edit</Text>
+            )}
           </TouchableOpacity>
         );
       })}
@@ -104,6 +125,12 @@ const styles = StyleSheet.create({
   stepContainer: {
     flex: 1,
     alignItems: 'center',
+    padding: 8,
+  },
+  navigableStep: {
+    // Subtle background to indicate the step is clickable
+    backgroundColor: 'rgba(237, 242, 247, 0.5)',
+    borderRadius: 8,
   },
   line: {
     position: 'absolute',
@@ -126,6 +153,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#e2e8f0',
     zIndex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dotActive: {
     borderColor: '#2563eb',
@@ -134,6 +163,11 @@ const styles = StyleSheet.create({
   dotCompleted: {
     backgroundColor: '#2563eb',
     borderColor: '#2563eb',
+  },
+  navigableDot: {
+    // Special styling for navigable dots
+    borderColor: '#2563eb',
+    transform: [{scale: 1.1}], // Make it slightly larger
   },
   label: {
     marginTop: 8,
@@ -148,8 +182,9 @@ const styles = StyleSheet.create({
   labelCompleted: {
     color: '#2563eb',
   },
-  clickableLabel: {
+  navigableLabel: {
     textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   exitButton: {
     flexDirection: 'row',
@@ -158,12 +193,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     marginLeft: 16,
     marginTop: 16,
-
-
   },
   exitButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#2563eb',
+  },
+  editHint: {
+    fontSize: 10,
+    color: '#2563eb',
+    marginTop: 2,
+    opacity: 0.8,
   },
 });

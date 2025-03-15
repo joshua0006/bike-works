@@ -27,9 +27,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import type { Job } from '../../types';
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { JobCard } from './JobCard';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
   jobs: Job[];
@@ -41,12 +42,26 @@ export function JobList({ jobs, onSelect, filter }: Props) {
   const [jobsData, setJobsData] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { user } = useAuth();
 
   useEffect(() => {
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      orderBy('createdAt', 'desc')
-    );
+    // Create a different query based on user role
+    let jobsQuery;
+    
+    if (user?.role === 'admin') {
+      // Admin sees all jobs
+      jobsQuery = query(
+        collection(db, 'jobs'),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      // Regular users only see their own jobs
+      jobsQuery = query(
+        collection(db, 'jobs'),
+        where('userId', '==', user?.id),
+        orderBy('createdAt', 'desc')
+      );
+    }
 
     const unsubscribe = onSnapshot(
       jobsQuery,
@@ -66,7 +81,7 @@ export function JobList({ jobs, onSelect, filter }: Props) {
     );
 
     return () => unsubscribe();
-  }, [filter]);
+  }, [filter, user]);
 
   if (loading) {
     return (
@@ -100,7 +115,7 @@ export function JobList({ jobs, onSelect, filter }: Props) {
     <FlatList
       data={jobsData}
       renderItem={({ item }) => <JobCard job={item} />}
-      keyExtractor={item => item.id}
+      keyExtractor={item => item.id || `job-${Math.random()}`}
       contentContainerStyle={styles.list}
     />
   );

@@ -69,6 +69,10 @@ export interface Bike {
   purchaseDate?: string;
   purchasePrice?: number;
   photos: string[];
+  notes?: string;
+  userId?: string;
+  clientId?: string;
+  clientName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -103,4 +107,18 @@ export interface Purchase {
   // Metadata
   createdAt: string;
   updatedAt: string;
+}
+
+export type UserRole = 'user' | 'admin';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  phone?: string;
+  bikes: string[]; // Array of bike IDs
+  jobs: string[]; // Array of job IDs
+  createdAt: Date;
+  updatedAt: Date;
 }

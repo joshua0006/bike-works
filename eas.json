@@ -19,6 +19,9 @@
         "credentialsSource": "remote",
         "distribution": "store",
         "image": "latest"
+      },
+      "android": {
+        "buildType": "apk"
       }
     }
   },

@@ -31,9 +31,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import type { Bike } from '../../types';
 import { useEffect, useState, useCallback } from 'react';
-import { collection, query, getDocs } from 'firebase/firestore';
+import { collection, query, getDocs, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
   bikes: Bike[];
@@ -47,6 +48,7 @@ export function BikeList() {
   const [error, setError] = useState('');
   const [selectedBike, setSelectedBike] = useState<Bike | null>(null);
   const router = useRouter();
+  const { user } = useAuth();
 
   useFocusEffect(
     useCallback(() => {
@@ -56,7 +58,16 @@ export function BikeList() {
         console.log('Starting bike fetch');
         setLoading(true);
         try {
-          const q = query(collection(db, 'bikes'));
+          let q;
+          
+          // If user is admin, show all bikes
+          // If user is regular user, only show bikes with userId matching user.id
+          if (user?.role === 'admin') {
+            q = query(collection(db, 'bikes'));
+          } else {
+            q = query(collection(db, 'bikes'), where('userId', '==', user?.id));
+          }
+          
           const querySnapshot = await getDocs(q);
           
           if (!isActive) return; // Prevent state updates if unmounted
@@ -86,7 +97,7 @@ export function BikeList() {
       return () => {
         isActive = false; // Cleanup on unmount
       };
-    }, []) // Empty dependency array ensures it runs only once per focus
+    }, [user]) // Re-run when user changes
   );
 
   const [refreshing, setRefreshing] = useState(false);
@@ -94,7 +105,15 @@ export function BikeList() {
     let isActive = true;
     setRefreshing(true);
     try {
-      const q = query(collection(db, 'bikes'));
+      let q;
+      
+      // Apply the same role-based filtering on refresh
+      if (user?.role === 'admin') {
+        q = query(collection(db, 'bikes'));
+      } else {
+        q = query(collection(db, 'bikes'), where('userId', '==', user?.id));
+      }
+      
       const querySnapshot = await getDocs(q);
       
       if (isActive) {
@@ -230,13 +249,6 @@ export function BikeList() {
                         <DetailItem label="Size" value={selectedBike.size} />
                         <DetailItem label="Type" value={selectedBike.type} />
                       </View>
-
-                      {selectedBike.notes && (
-                        <View style={styles.notesContainer}>
-                          <Text style={styles.sectionLabel}>Additional Notes</Text>
-                          <Text style={styles.notesText}>{selectedBike.notes}</Text>
-                        </View>
-                      )}
                     </>
                   )}
                 </ScrollView>

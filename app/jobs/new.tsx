@@ -1,83 +1,223 @@
-import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { JobList } from '../../components/jobs/JobList';
-import { db } from '../../lib/firebase';
-import { Job } from '../../types';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { JobSheetScanner } from '../../components/jobs/JobSheetScanner';
-export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { useRouter, Stack } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { createJobForUser } from '@/lib/userOperations';
 
-  useEffect(() => {
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      orderBy('createdAt', 'desc')
-    );
+type JobFormData = {
+  customerName: string;
+  customerPhone: string;
+  bikeModel: string;
+  dateIn: string;
+  workRequired: string;
+  laborCost: string;
+  totalCost: string;
+};
 
-    const unsubscribe = onSnapshot(
-      jobsQuery,
-      (snapshot) => {
-        const jobsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Job[];
-        setJobs(jobsData);
-        setLoading(false);
-      },
-      (err) => {
-        setError('Failed to load jobs');
-        console.error(err);
-        setLoading(false);
+export default function NewJobScreen() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const { colors, primary } = useTheme();
+  
+  const [formData, setFormData] = useState<JobFormData>({
+    customerName: '',
+    customerPhone: '',
+    bikeModel: '',
+    dateIn: new Date().toISOString().split('T')[0],
+    workRequired: '',
+    laborCost: '',
+    totalCost: '',
+  });
+  const [loading, setLoading] = useState(false);
+  
+  const updateFormField = (field: keyof JobFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleSubmit = async () => {
+    // Form validation
+    for (const [key, value] of Object.entries(formData)) {
+      if (!value.trim()) {
+        Alert.alert('Error', `Please enter ${key.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+        return;
       }
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#2563eb" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
-
+    }
+    
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to create a job');
+      router.push('/auth/login');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const laborCost = parseFloat(formData.laborCost);
+      const totalCost = parseFloat(formData.totalCost);
+      
+      if (isNaN(laborCost) || isNaN(totalCost)) {
+        throw new Error('Costs must be valid numbers');
+      }
+      
+      const jobId = await createJobForUser(user.id, {
+        customerName: formData.customerName,
+        customerPhone: formData.customerPhone,
+        bikeModel: formData.bikeModel,
+        dateIn: formData.dateIn,
+        workRequired: formData.workRequired,
+        workDone: '', // Empty initially
+        laborCost,
+        totalCost,
+        status: 'pending',
+      });
+      
+      Alert.alert('Success', 'Job created successfully!');
+      router.back();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create job');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
-    <View style={styles.container}>
-        <JobSheetScanner onComplete={handleScanComplete} />
-    </View>
+    <>
+      <Stack.Screen options={{ 
+        title: 'Create New Job',
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
+      }} />
+      
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.formContainer}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Customer Information</Text>
+          
+          <Text style={[styles.label, { color: colors.text }]}>Name</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+            placeholder="Customer's full name"
+            placeholderTextColor={colors.textSecondary}
+            value={formData.customerName}
+            onChangeText={(value) => updateFormField('customerName', value)}
+          />
+          
+          <Text style={[styles.label, { color: colors.text }]}>Phone</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+            placeholder="Customer's phone number"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="phone-pad"
+            value={formData.customerPhone}
+            onChangeText={(value) => updateFormField('customerPhone', value)}
+          />
+          
+          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>Bike Information</Text>
+          
+          <Text style={[styles.label, { color: colors.text }]}>Bike Model</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+            placeholder="Brand and model of bike"
+            placeholderTextColor={colors.textSecondary}
+            value={formData.bikeModel}
+            onChangeText={(value) => updateFormField('bikeModel', value)}
+          />
+          
+          <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 24 }]}>Job Details</Text>
+          
+          <Text style={[styles.label, { color: colors.text }]}>Work Required</Text>
+          <TextInput
+            style={[styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+            placeholder="Description of work needed"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            value={formData.workRequired}
+            onChangeText={(value) => updateFormField('workRequired', value)}
+          />
+          
+          <Text style={[styles.label, { color: colors.text }]}>Labor Cost ($)</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+            placeholder="Cost of labor"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="decimal-pad"
+            value={formData.laborCost}
+            onChangeText={(value) => updateFormField('laborCost', value)}
+          />
+          
+          <Text style={[styles.label, { color: colors.text }]}>Total Cost ($)</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+            placeholder="Total cost including parts"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="decimal-pad"
+            value={formData.totalCost}
+            onChangeText={(value) => updateFormField('totalCost', value)}
+          />
+          
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: primary }]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'Creating Job...' : 'Create Job'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </>
   );
 }
-
-const handleScanComplete = (job: Partial<Job>) => {
-  console.log('Job scanned:', job);
-};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f8fafc',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1e293b',
+  formContainer: {
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 16,
   },
-  errorText: {
-    color: '#ef4444',
+  label: {
     fontSize: 16,
-    textAlign: 'center',
-  }
+    fontWeight: '500',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  input: {
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+  },
+  textArea: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+  },
+  button: {
+    height: 50,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 32,
+    marginBottom: 16,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 }); 
